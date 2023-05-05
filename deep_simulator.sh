@@ -254,6 +254,7 @@ PREALI="align"
 # store the tmp files
 echo "Pre-process input genome..."
 #source activate tensorflow_cdpm
+eval "$(conda shell.bash hook)"
 conda activate tensorflow_cdpm
 python2 $home/util/genome_preprocess.py \
 	-i $FULLFILE \
