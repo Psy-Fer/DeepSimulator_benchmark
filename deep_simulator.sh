@@ -253,13 +253,14 @@ PREALI="align"
 # we should make a tmp directory named after the input file to
 # store the tmp files
 echo "Pre-process input genome..."
-source activate tensorflow_cdpm
+#source activate tensorflow_cdpm
+conda activate tensorflow_cdpm
 python2 $home/util/genome_preprocess.py \
 	-i $FULLFILE \
 	-o $FILENAME/processed_genome \
 	-r 1 \
 	-m $SEP
-source deactivate
+#source deactivate
 echo "Pre-process input genome done!"
 
 # preprocessing, sampling the read
@@ -272,7 +273,7 @@ then
 fi
 if [ $SAMPLE_NUM -gt 0 ]
 then
-	source activate tensorflow_cdpm
+	#source activate tensorflow_cdpm
 	for file_processed_genome in `ls $FILENAME/processed_genome*`; do
 		#statements
 		# echo ${file_processed_genome}
@@ -286,7 +287,7 @@ then
 			-S $RANDOM_SEED \
 			$circular
 	done
-	source deactivate
+	#source deactivate
 else
 	for file_processed_genome in `ls $FILENAME/processed_genome*`; do
 		#statements
@@ -352,7 +353,7 @@ if [ $SIMULATOR_MODE -eq 0 ]
 then
 	echo "Running the context-dependent pore model..."
 	#-> context-dependent simulator
-	source activate tensorflow_cdpm
+	#source activate tensorflow_cdpm
 	export DeepSimulatorHome=$home
 	python2 $home/pore_model/src/context_simulator.py \
 		-i $FILENAME/sampled_read.fasta \
@@ -365,11 +366,11 @@ then
 		-F $FILENAME/fast5 \
 		-T $home/util/$fast5_template \
 		$perf_mode $align_out $sig_out
-	source deactivate
+	#source deactivate
 else
 	echo "Running the context-independent pore model..."
 	#-> contect-independent simulator
-	source activate tensorflow_cdpm
+	#source activate tensorflow_cdpm
 	python2 $home/pore_model/src/kmer_simulator.py \
 		-i $FILENAME/sampled_read.fasta \
 		-p $FILENAME/signal/$PREFIX \
@@ -381,65 +382,65 @@ else
 		-F $FILENAME/fast5 \
 		-T $home/util/$fast5_template \
 		$perf_mode $align_out $sig_out
-	source deactivate
+	#source deactivate
 fi
 echo "Finished generate the simulated signals and fast5 files!"
-
+conda deactivate
 #--------- base-calling ----------------#
 #-> guppy version
-guppy=guppy_3.1.5
+#guppy=guppy_3.1.5
 # basecalling using guppy_gpu by dfault
-echo "Running Basecalling..."
-FAST5_DIR="$FILENAME/fast5"
-FASTQ_DIR="$FILENAME/fastq"
-rm -rf $FASTQ_DIR/*
-mkdir -p $FASTQ_DIR
+#echo "Running Basecalling..."
+#FAST5_DIR="$FILENAME/fast5"
+#FASTQ_DIR="$FILENAME/fastq"
+#rm -rf $FASTQ_DIR/*
+#mkdir -p $FASTQ_DIR
 # run different base-callers
-if [ $BASE_CALLER -eq 1 ]
-then
-	echo "   Basecalling with Guppy_GPU..."
-	$home/base_caller/$guppy/ont-guppy/bin/guppy_basecaller -r --input_path $FAST5_DIR \
-		--save_path $FASTQ_DIR -c dna_r9.4.1_450bps_hac.cfg \
-		-x auto
-elif [ $BASE_CALLER -eq 2 ]
-then
-	echo "   Basecalling with Guppy_CPU..."
-	$home/base_caller/$guppy/ont-guppy-cpu/bin/guppy_basecaller -r --input_path $FAST5_DIR \
-		--save_path $FASTQ_DIR -c dna_r9.4.1_450bps_hac.cfg \
-		--cpu_threads_per_caller $THREAD_NUM --num_callers 1
-else
-	echo "   Basecalling with Albacore..."
-	source activate basecall
-	read_fast5_basecaller.py -i $FAST5_DIR -s $FASTQ_DIR \
-		-c r94_450bps_linear.cfg -o fastq -t $THREAD_NUM
-	source deactivate
-fi
-echo "Basecalling finished!"
+#if [ $BASE_CALLER -eq 1 ]
+#then
+#	echo "   Basecalling with Guppy_GPU..."
+#	$home/base_caller/$guppy/ont-guppy/bin/guppy_basecaller -r --input_path $FAST5_DIR \
+#		--save_path $FASTQ_DIR -c dna_r9.4.1_450bps_hac.cfg \
+#		-x auto
+#elif [ $BASE_CALLER -eq 2 ]
+#then
+#	echo "   Basecalling with Guppy_CPU..."
+#	$home/base_caller/$guppy/ont-guppy-cpu/bin/guppy_basecaller -r --input_path $FAST5_DIR \
+#		--save_path $FASTQ_DIR -c dna_r9.4.1_450bps_hac.cfg \
+#		--cpu_threads_per_caller $THREAD_NUM --num_callers 1
+#else
+#	echo "   Basecalling with Albacore..."
+#	source activate basecall
+#	read_fast5_basecaller.py -i $FAST5_DIR -s $FASTQ_DIR \
+#		-c r94_450bps_linear.cfg -o fastq -t $THREAD_NUM
+#	source deactivate
+#fi
+#echo "Basecalling finished!"
 
 #--------- calculate accuracy ----------#
 # check result
-echo "Checking the read accuracy..."
-if [ $BASE_CALLER -eq 3 ]
-then
-	cat $FILENAME/fastq/workspace/pass/*.fastq > $FILENAME/pass.fastq 2>$FILENAME/err
-	cat $FILENAME/fastq/workspace/fail/*.fastq > $FILENAME/fail.fastq 2>$FILENAME/err
-else
-	cat $FILENAME/fastq/*.fastq > $FILENAME/pass.fastq 2>$FILENAME/err
-	touch $FILENAME/fail.fastq
-fi
-pass_num=`grep "^@" $FILENAME/pass.fastq | wc | awk '{print $1}'`
-fail_num=`grep "^@" $FILENAME/fail.fastq | wc | awk '{print $1}'`
-cat $FILENAME/pass.fastq $FILENAME/fail.fastq > $FILENAME/test.fastq
-$home/util/minimap2 -Hk19 -t $THREAD_NUM -c $FULLFILE \
-	$FILENAME/test.fastq 1> $FILENAME/mapping.paf 2> $FILENAME/err
-rm -f $FILENAME/err
-accuracy=`awk 'BEGIN{a=0;b=0}{a+=$10/$11;b++}END{print a/b}' $FILENAME/mapping.paf`
-totalnum=`grep "^@" $FILENAME/test.fastq | wc | awk '{print $1}'`
-echo "Here is the mapping identity: $accuracy of $totalnum (pass $pass_num + fail $fail_num) reads passed base-calling."
-echo "$accuracy $totalnum $pass_num $fail_num" > $FILENAME/accuracy
+#echo "Checking the read accuracy..."
+#if [ $BASE_CALLER -eq 3 ]
+#then
+#	cat $FILENAME/fastq/workspace/pass/*.fastq > $FILENAME/pass.fastq 2>$FILENAME/err
+#	cat $FILENAME/fastq/workspace/fail/*.fastq > $FILENAME/fail.fastq 2>$FILENAME/err
+#else
+#	cat $FILENAME/fastq/*.fastq > $FILENAME/pass.fastq 2>$FILENAME/err
+#	touch $FILENAME/fail.fastq
+#fi
+#pass_num=`grep "^@" $FILENAME/pass.fastq | wc | awk '{print $1}'`
+#fail_num=`grep "^@" $FILENAME/fail.fastq | wc | awk '{print $1}'`
+#cat $FILENAME/pass.fastq $FILENAME/fail.fastq > $FILENAME/test.fastq
+#$home/util/minimap2 -Hk19 -t $THREAD_NUM -c $FULLFILE \
+#	$FILENAME/test.fastq 1> $FILENAME/mapping.paf 2> $FILENAME/err
+#rm -f $FILENAME/err
+#accuracy=`awk 'BEGIN{a=0;b=0}{a+=$10/$11;b++}END{print a/b}' $FILENAME/mapping.paf`
+#totalnum=`grep "^@" $FILENAME/test.fastq | wc | awk '{print $1}'`
+#echo "Here is the mapping identity: $accuracy of $totalnum (pass $pass_num + fail $fail_num) reads passed base-calling."
+#echo "$accuracy $totalnum $pass_num $fail_num" > $FILENAME/accuracy
 # remove temporary files
-rm -rf $FILENAME/fastq
-rm -f $FILENAME/test.fastq
+#rm -rf $FILENAME/fastq
+#rm -f $FILENAME/test.fastq
 
 #---------- exit -----------#
 exit 0
